@@ -1,10 +1,11 @@
 /**
  * RoomFloor — Renders a room's floor polygon as a filled mesh
- * Room schema: { id, type, polygon: [[x,z],...], ... }
+ * Room schema: { id, type, polygon: [[x,z],...], texture?: { diffuse, normal, displacement } }
  */
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useSceneStore } from '../../store/sceneStore'
+import TexturedMaterial from './TexturedMaterial'
 
 const ROOM_COLORS_DARK = {
   living_room: '#ffffff',
@@ -32,8 +33,8 @@ export default function RoomFloor({ room }) {
   const darkMode = useSceneStore(s => s.darkMode)
   const isSelected = selectedId === room.id
 
-  const geometry = useMemo(() => {
-    if (!room.polygon || room.polygon.length < 3) return null
+  const { geometry, sizeX, sizeY } = useMemo(() => {
+    if (!room.polygon || room.polygon.length < 3) return { geometry: null, sizeX: 1, sizeY: 1 }
 
     const shape = new THREE.Shape()
     shape.moveTo(room.polygon[0][0], room.polygon[0][1])
@@ -43,30 +44,43 @@ export default function RoomFloor({ room }) {
     shape.closePath()
 
     const geo = new THREE.ShapeGeometry(shape)
-    // Rotate flat XY shape to XZ plane
-    geo.rotateX(-Math.PI / 2)
-    return geo
+    
+    // Compute bounding box before rotating so we get the XY (which maps to XZ in world) size for UVs
+    geo.computeBoundingBox()
+    const sizeX = geo.boundingBox.max.x - geo.boundingBox.min.x
+    const sizeY = geo.boundingBox.max.y - geo.boundingBox.min.y
+
+    // Rotate flat XY shape to XZ plane correctly (+90 deg)
+    geo.rotateX(Math.PI / 2)
+    return { geometry: geo, sizeX, sizeY }
   }, [room.polygon])
 
   if (!geometry) return null
 
   const colors = darkMode ? ROOM_COLORS_DARK : ROOM_COLORS_LIGHT
-  const color = colors[room.type] || colors.default
+  const baseColor = colors[room.type] || colors.default
+
+  // The key on the group forces a full remount when texture changes,
+  // which ensures the Three.js material shader recompiles with/without maps
+  const textureKey = room.texture?.id || 'no-texture'
 
   return (
     <mesh
+      key={textureKey}
       geometry={geometry}
       position={[0, 0.01, 0]}
       receiveShadow
       onClick={(e) => { e.stopPropagation(); setSelected(room.id) }}
     >
-      <meshStandardMaterial
-        color={isSelected ? '#1e1b4b' : color}
-        roughness={0.9}
-        metalness={0}
+      <TexturedMaterial 
+        texture={room.texture} 
+        textureScaleX={room.textureScaleX}
+        textureScaleY={room.textureScaleY}
+        baseColor={baseColor} 
+        isSelected={isSelected} 
+        sizeX={sizeX}
+        sizeY={sizeY}
         side={THREE.DoubleSide}
-        emissive={isSelected ? '#3730a3' : '#000000'}
-        emissiveIntensity={isSelected ? 0.08 : 0}
       />
     </mesh>
   )

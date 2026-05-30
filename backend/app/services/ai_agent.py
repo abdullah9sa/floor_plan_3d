@@ -223,7 +223,7 @@ class AIAgent:
             }
         }
         
-        models = ["gemini-1.5-flash", "gemini-2.5-flash"]
+        models = ["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]
         last_err = None
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
@@ -304,7 +304,7 @@ class AIAgent:
 
     def _call_llm_gemini(self, prompt: str) -> Dict[str, Any]:
         """Calls Gemini with a plain text prompt and expects JSON back, trying multiple models."""
-        models = ["gemini-2.5-flash", "gemini-1.5-flash"]
+        models = ["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]
         last_err = None
         
         for model in models:
@@ -358,7 +358,7 @@ class AIAgent:
     def _call_gemini(self, prompt: str) -> Dict[str, Any]:
         """Calls Google Gemini developer API with JSON schema enforcement, trying multiple models."""
         logger.info("[AIAgent] Calling Gemini API for mutation processing...")
-        models = ["gemini-2.5-flash", "gemini-1.5-flash"]
+        models = ["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]
         last_err = None
         
         for model in models:

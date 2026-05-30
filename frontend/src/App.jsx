@@ -40,6 +40,7 @@ export default function App() {
   const toggleUploadModal = useSceneStore(s => s.toggleUploadModal)
   const darkMode = useSceneStore(s => s.darkMode)
   const viewMode = useSceneStore(s => s.viewMode)
+  const showLightingPanel = useSceneStore(s => s.showLightingPanel)
 
   // Toggle body light class for theme switcher
   useEffect(() => {
@@ -52,7 +53,9 @@ export default function App() {
 
   // Load demo scene on mount
   useEffect(() => {
-    DEMO_MUTATIONS.forEach(m => applyMutation(m.type, m.payload))
+    if (useSceneStore.getState().scene.rooms.length === 0) {
+      DEMO_MUTATIONS.forEach(m => applyMutation(m.type, m.payload))
+    }
   }, [])
 
   // Keyboard shortcuts
@@ -88,7 +91,7 @@ export default function App() {
           <div style={{ pointerEvents: 'auto' }}>
             <TopDock />
             <PropertiesPanel />
-            {viewMode === 'lighting' && <LightingPanel />}
+            {showLightingPanel && <LightingPanel />}
             <DiagnosticsOverlay />
             <AICommandBar />
             <SceneInfoBar />

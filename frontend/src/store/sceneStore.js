@@ -51,11 +51,70 @@ export const useSceneStore = create(
     diagnostics: [],
     sceneCenter: [7, 0, 5],   // auto-computed camera target [x, y, z]
     sceneRadius: 10,          // approximate scene radius for camera zoom
-    lightSettings: {
-      ambientIntensity: 0.4,
-      dirIntensity: 1.2,
-      shadowOpacity: 0.65,
-    },
+    lightSettings: (() => {
+      const defaults = {
+        ambientIntensity: 0.4,
+        dirIntensity: 1.2,
+        shadowOpacity: 0.65,
+        envIntensity: 0.5,
+        envPreset: 'studio',
+        envBackground: false,
+        envBlur: 0,
+        envRotation: 0,
+        showGrid: true,
+        bgColor: '',
+        gridColor: '',
+        showFog: false,
+        fogDensity: 0.02,
+        fogColor: '',
+        // ── Post-Processing ──────────────────────────────
+        // Tonemapping
+        toneMapping: 'aces',       // 'aces' | 'reinhard' | 'cineon' | 'linear'
+        toneMappingExposure: 1.0,
+        // Bloom
+        bloomEnabled: false,
+        bloomIntensity: 0.5,
+        bloomThreshold: 0.9,
+        bloomSmoothing: 0.3,
+        // SSAO
+        ssaoEnabled: false,
+        ssaoIntensity: 15,
+        ssaoRadius: 5,
+        ssaoLuminanceInfluence: 0.6,
+        // Depth of Field
+        dofEnabled: false,
+        dofFocusDistance: 0.02,
+        dofFocalLength: 0.05,
+        dofBokehScale: 3,
+        // Vignette (subtle frame darkening)
+        vignetteEnabled: false,
+        vignetteOffset: 0.3,
+        vignetteDarkness: 0.7,
+        // Anti-Aliasing
+        aaMode: 'smaa',            // 'smaa' | 'fxaa' | 'none'
+        msaaSamples: 4,            // 0, 2, 4, or 8 (multisampling on EffectComposer FBO)
+        postProcessingEnabled: true,
+        // God Rays (volumetric light approximation)
+        godRaysEnabled: false,
+        godRaysDensity: 0.96,
+        godRaysDecay: 0.93,
+        godRaysWeight: 0.4,
+        godRaysExposure: 0.6,
+      }
+      try {
+        const saved = localStorage.getItem('plany_default_light_settings')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          return { ...defaults, ...parsed }
+        }
+      } catch (e) {
+        console.error('Failed to load default light settings from localStorage:', e)
+      }
+      return defaults
+    })(),
+    showLightingPanel: false,
+    gltfExportTriggeredAt: null,
+
 
     // Vision state (Phase 2)
     visionResult: null,
@@ -138,6 +197,17 @@ export const useSceneStore = create(
 
     // ── Lighting Actions ──────────────────────────────────────────────────
     setLightSettings: (settings) => set(s => ({ lightSettings: { ...s.lightSettings, ...settings } })),
+    toggleLightingPanel: () => set(s => ({ showLightingPanel: !s.showLightingPanel })),
+    saveLightSettingsAsDefault: () => {
+      const { lightSettings } = get()
+      try {
+        localStorage.setItem('plany_default_light_settings', JSON.stringify(lightSettings))
+        return true
+      } catch (e) {
+        console.error('Failed to save default light settings:', e)
+        return false
+      }
+    },
     
     // ── Vision Actions (Phase 2) ──────────────────────────────────────────
     setVisionResult: (result) => set({ visionResult: result }),
@@ -237,6 +307,21 @@ export const useSceneStore = create(
         wallCount: data.scene?.walls?.length || 0,
         roomCount: data.scene?.rooms?.length || 0,
       }))
+    },
+
+    importScene: (importedScene) => {
+      set({
+        scene: importedScene,
+        eventLog: [],
+        undoStack: [],
+        redoStack: [],
+        selectedId: null,
+      })
+      setTimeout(() => get().computeSceneCenter(), 50)
+    },
+
+    triggerGltfExport: () => {
+      set({ gltfExportTriggeredAt: Date.now() })
     },
   }))
 )

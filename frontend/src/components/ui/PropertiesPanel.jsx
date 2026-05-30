@@ -1,8 +1,69 @@
 /**
  * PropertiesPanel — Left-side panel showing selected object properties or global controls
  */
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSceneStore } from '../../store/sceneStore'
+
+const TextureGrid = React.memo(({ textures, selectedTextureId, onSelect }) => {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', maxHeight: '260px', overflowY: 'auto' }}>
+      <button
+        onClick={() => onSelect(null)}
+        style={{
+          padding: '8px',
+          borderRadius: '8px',
+          border: !selectedTextureId ? '2px solid #6366f1' : '1px solid var(--border-subtle)',
+          background: !selectedTextureId ? 'rgba(99,102,241,0.1)' : 'var(--bg-secondary)',
+          color: 'var(--text-primary)',
+          fontSize: '10px',
+          cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '4px'
+        }}
+      >
+        <div style={{ width: '100%', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '16px' }}>⬜</span>
+        </div>
+        <span>None</span>
+      </button>
+      {textures.map(t => (
+        <button
+          key={t.id}
+          onClick={() => onSelect(t)}
+          style={{
+            padding: '4px',
+            borderRadius: '8px',
+            border: selectedTextureId === t.id ? '2px solid #6366f1' : '1px solid var(--border-subtle)',
+            background: selectedTextureId === t.id ? 'rgba(99,102,241,0.1)' : 'var(--bg-secondary)',
+            color: 'var(--text-primary)',
+            fontSize: '10px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+            overflow: 'hidden'
+          }}
+        >
+          {t.diffuse && (
+            <img 
+              src={t.diffuse} 
+              alt={t.name || t.id}
+              loading="lazy"
+              style={{ width: '100%', height: '50px', objectFit: 'cover', borderRadius: '4px' }}
+            />
+          )}
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+            {t.name || t.id}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+})
 
 function Field({ label, value }) {
   return (
@@ -47,6 +108,15 @@ export default function PropertiesPanel() {
   const setSelected = useSceneStore(s => s.setSelected)
   const applyMutation = useSceneStore(s => s.applyMutation)
 
+  const [textures, setTextures] = useState([])
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/textures')
+      .then(res => res.json())
+      .then(data => setTextures(data.textures || []))
+      .catch(err => console.error("Failed to load textures", err))
+  }, [])
+
   const selectedObj = selectedId
     ? [...scene.rooms, ...scene.walls, ...scene.furniture, ...(scene.openings || [])].find(o => o.id === selectedId)
     : null
@@ -71,6 +141,7 @@ export default function PropertiesPanel() {
     const id = selectedObj.id
     if (id.startsWith('wall_')) applyMutation('UPDATE_WALL', { id, ...payload })
     if (id.startsWith('open_')) applyMutation('UPDATE_OPENING', { id, ...payload })
+    if (id.startsWith('room_')) applyMutation('UPDATE_ROOM', { id, ...payload })
   }
 
   const handleGlobalUpdate = (type, payload) => {
@@ -82,6 +153,12 @@ export default function PropertiesPanel() {
   const avgWallThick = scene.walls.length ? scene.walls.reduce((s, w) => s + (w.thickness || 0.2), 0) / scene.walls.length : 0.2
   const avgOpenHeight = scene.openings?.length ? scene.openings.reduce((s, o) => s + (o.height || 2), 0) / scene.openings.length : 2
   const avgOpenWidth = scene.openings?.length ? scene.openings.reduce((s, o) => s + (o.width || 1), 0) / scene.openings.length : 1
+
+  const isRoom = selectedObj?.id?.startsWith('room_')
+  const isWall = selectedObj?.id?.startsWith('wall_')
+  const isDoor = selectedObj?.id?.startsWith('open_') && selectedObj?.type === 'door'
+  const canBeTextured = isRoom || isWall || isDoor
+  const textureLabel = isRoom ? "Floor Texture" : isWall ? "Wall Texture" : "Door Texture"
 
   return (
     <AnimatePresence>
@@ -131,6 +208,46 @@ export default function PropertiesPanel() {
               )}
               {selectedObj.width !== undefined && (
                 <SliderField label="Width" value={selectedObj.width} min={0.5} max={4.0} step={0.1} onChange={v => handleUpdate({ width: v })} />
+              )}
+
+              {/* Texture Selector (for Rooms, Walls, Doors) */}
+              {canBeTextured && textures.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'Inter,sans-serif', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    {textureLabel}
+                  </div>
+                  <TextureGrid
+                    textures={textures}
+                    selectedTextureId={selectedObj.texture?.id}
+                    onSelect={(t) => handleUpdate({ texture: t })}
+                  />
+                </div>
+              )}
+
+              {/* Texture Scale Control */}
+              {canBeTextured && selectedObj.texture && (
+                <div style={{ marginBottom: '16px' }}>
+                  <SliderField 
+                    label="Texture Scale X" 
+                    value={selectedObj.textureScaleX || 2.0} 
+                    min={0.5} 
+                    max={10.0} 
+                    step={0.1} 
+                    onChange={v => handleUpdate({ textureScaleX: v })} 
+                  />
+                  <div style={{ height: '8px' }} />
+                  <SliderField 
+                    label="Texture Scale Y" 
+                    value={selectedObj.textureScaleY || 2.0} 
+                    min={0.5} 
+                    max={10.0} 
+                    step={0.1} 
+                    onChange={v => handleUpdate({ textureScaleY: v })} 
+                  />
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Adjusts the physical size of the texture tile (in meters) per axis.
+                  </div>
+                </div>
               )}
 
               {/* Read-only props */}

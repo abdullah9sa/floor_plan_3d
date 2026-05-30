@@ -5,6 +5,7 @@
 import { useMemo } from 'react'
 import { useSceneStore } from '../../store/sceneStore'
 import * as THREE from 'three'
+import TexturedMaterial from './TexturedMaterial'
 
 const MATERIAL_COLORS = {
   wall_paint_white: '#e2e8f0',
@@ -83,22 +84,29 @@ export default function WallMesh({ wall }) {
 
   const color = MATERIAL_COLORS[wall.material] || MATERIAL_COLORS.default
   const thickness = wall.thickness || 0.2
+  const wallTextureKey = wall.texture?.id || 'no-texture'
 
   return (
     <group position={position} rotation={rotation}>
       {/* Wall Solid Mesh */}
       <mesh
+        key={wallTextureKey}
         geometry={geometry}
         castShadow
         receiveShadow
         onClick={(e) => { e.stopPropagation(); setSelected(wall.id) }}
       >
-        <meshStandardMaterial
-          color={isSelected ? '#818cf8' : color}
+        <TexturedMaterial
+          texture={wall.texture}
+          textureScaleX={wall.textureScaleX}
+          textureScaleY={wall.textureScaleY}
+          baseColor={color}
+          isSelected={isSelected}
+          selectedColor="#818cf8"
+          sizeX={length}
+          sizeY={wall.height || 3}
           roughness={0.8}
           metalness={0.05}
-          emissive={isSelected ? '#3730a3' : '#000000'}
-          emissiveIntensity={isSelected ? 0.2 : 0}
         />
       </mesh>
 
@@ -107,22 +115,49 @@ export default function WallMesh({ wall }) {
         const uCenter = length * op.position
         const vStart = op.type === 'window' ? 0.9 : 0
         const frameThick = thickness + 0.02 // slightly proud of wall
+        const isOpSelected = selectedId === op.id
 
         if (op.type === 'door') {
+          const doorTextureKey = op.texture?.id || 'no-texture'
           // Door Frame + Swing Slab
           return (
-            <group key={op.id} position={[uCenter, vStart, 0]}>
+            <group 
+              key={op.id} 
+              position={[uCenter, vStart, 0]}
+              onClick={(e) => { e.stopPropagation(); setSelected(op.id) }}
+            >
               {/* Frame */}
               <mesh position={[0, op.height / 2, 0]} castShadow>
                 <boxGeometry args={[op.width, op.height, frameThick]} />
-                <meshStandardMaterial color="#334155" roughness={0.7} wireframe={true} />
+                <meshStandardMaterial 
+                  color={isOpSelected ? "#818cf8" : "#334155"} 
+                  roughness={0.7} 
+                  wireframe={true} 
+                  emissive={isOpSelected ? "#3730a3" : "#000000"}
+                  emissiveIntensity={isOpSelected ? 0.2 : 0}
+                />
               </mesh>
               
               {/* Door Panel (Slightly Open - swing angle) */}
               <group position={[-op.width / 2, 0, 0]} rotation={[0, Math.PI / 4, 0]}>
-                <mesh position={[op.width / 2, op.height / 2, 0]} castShadow>
+                <mesh 
+                  key={doorTextureKey}
+                  position={[op.width / 2, op.height / 2, 0]} 
+                  castShadow
+                >
                   <boxGeometry args={[op.width - 0.04, op.height - 0.04, 0.04]} />
-                  <meshStandardMaterial color="#78350f" roughness={0.6} metalness={0.1} />
+                  <TexturedMaterial
+                    texture={op.texture}
+                    textureScaleX={op.textureScaleX}
+                    textureScaleY={op.textureScaleY}
+                    baseColor="#78350f"
+                    isSelected={isOpSelected}
+                    selectedColor="#818cf8"
+                    sizeX={op.width - 0.04}
+                    sizeY={op.height - 0.04}
+                    roughness={0.6}
+                    metalness={0.1}
+                  />
                 </mesh>
                 {/* Door Handle */}
                 <mesh position={[op.width - 0.1, op.height / 2, 0.03]}>
@@ -135,11 +170,21 @@ export default function WallMesh({ wall }) {
         } else if (op.type === 'window') {
           // Window Frame + Glass Pane
           return (
-            <group key={op.id} position={[uCenter, vStart + op.height / 2, 0]}>
+            <group 
+              key={op.id} 
+              position={[uCenter, vStart + op.height / 2, 0]}
+              onClick={(e) => { e.stopPropagation(); setSelected(op.id) }}
+            >
               {/* Metal Frame Outline */}
               <mesh castShadow>
                 <boxGeometry args={[op.width, op.height, frameThick]} />
-                <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.8} />
+                <meshStandardMaterial 
+                  color={isOpSelected ? "#818cf8" : "#1e293b"} 
+                  roughness={0.4} 
+                  metalness={0.8}
+                  emissive={isOpSelected ? "#3730a3" : "#000000"}
+                  emissiveIntensity={isOpSelected ? 0.2 : 0}
+                />
               </mesh>
               {/* Glass Pane */}
               <mesh>

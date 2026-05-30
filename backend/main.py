@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from app.routers import scene, ai_commands, health, vision
+from app.routers import scene, ai_commands, health, vision, textures
 from app.core.config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -41,3 +41,4 @@ app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(scene.router, prefix="/api/scene", tags=["Scene Graph"])
 app.include_router(ai_commands.router, prefix="/api/ai", tags=["AI Commands"])
 app.include_router(vision.router, prefix="/api/vision", tags=["Vision"])
+app.include_router(textures.router, prefix="/api/textures", tags=["Textures"])

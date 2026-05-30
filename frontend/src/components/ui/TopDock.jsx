@@ -2,7 +2,7 @@
  * TopDock — Floating mode switcher toolbar
  * Modes: top-view | walkthrough | material | lighting
  */
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useSceneStore } from '../../store/sceneStore'
 import SavedScenesModal from './SavedScenesModal'
@@ -12,7 +12,6 @@ const MODES = [
   { id: 'orbit', icon: '⛶', label: '3D Orbit' },
   { id: 'walkthrough', icon: '👁', label: 'Walkthrough' },
   { id: 'material', icon: '◈', label: 'Materials' },
-  { id: 'lighting', icon: '☀', label: 'Lighting' },
 ]
 
 export default function TopDock() {
@@ -25,7 +24,88 @@ export default function TopDock() {
   const toggleUploadModal = useSceneStore(s => s.toggleUploadModal)
   const darkMode = useSceneStore(s => s.darkMode)
   const toggleDarkMode = useSceneStore(s => s.toggleDarkMode)
+  const showLightingPanel = useSceneStore(s => s.showLightingPanel)
+  const toggleLightingPanel = useSceneStore(s => s.toggleLightingPanel)
+
+  const scene = useSceneStore(s => s.scene)
+  const importScene = useSceneStore(s => s.importScene)
+  const triggerGltfExport = useSceneStore(s => s.triggerGltfExport)
+
   const [showSavedModal, setShowSavedModal] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const sceneName = scene.project.name || 'Untitled'
+
+  useEffect(() => {
+    if (!showExportDropdown) return
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('#export-menu-container')) {
+        setShowExportDropdown(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showExportDropdown])
+
+  const handleExportJson = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(scene, null, 2))
+    const link = document.createElement('a')
+    link.href = dataStr
+    link.download = `${sceneName.toLowerCase().replace(/\s+/g, '_')}_scene.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setShowExportDropdown(false)
+  }
+
+  const handleImportJson = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result)
+        if (parsed.walls && parsed.rooms) {
+          importScene(parsed)
+          setShowExportDropdown(false)
+        } else {
+          alert("Invalid file format: Make sure it's a valid Plany project JSON.")
+        }
+      } catch (err) {
+        alert("Failed to parse JSON file.")
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const handleExportGltf = () => {
+    triggerGltfExport()
+    setShowExportDropdown(false)
+  }
+
+  const handleCaptureScreenshot = () => {
+    const wrapper = document.getElementById('scene-canvas')
+    const canvas = wrapper ? wrapper.querySelector('canvas') : null
+    if (!canvas) {
+      alert("Canvas element not found.")
+      return
+    }
+    try {
+      const dataUrl = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = `${sceneName.toLowerCase().replace(/\s+/g, '_')}_screenshot.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setShowExportDropdown(false)
+    } catch (err) {
+      console.error(err)
+      alert("Failed to capture screenshot.")
+    }
+  }
+
 
   return (
     <motion.div
@@ -179,6 +259,123 @@ export default function TopDock() {
         >
           <span style={{ fontSize: '15px' }}>💾</span>
           <span>Saved</span>
+        </button>
+      </div>
+
+      {/* Export Options Dropdown */}
+      <div id="export-menu-container" className="glass rounded-2xl p-1 flex items-center relative">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImportJson}
+          accept=".json"
+          style={{ display: 'none' }}
+        />
+        <button
+          onClick={() => setShowExportDropdown(!showExportDropdown)}
+          title="Export Options (JSON, GLTF, PNG)"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 14px',
+            borderRadius: '12px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 500,
+            transition: 'all 0.2s ease',
+            background: showExportDropdown ? 'var(--bg-panel-hover)' : 'transparent',
+            color: 'var(--text-secondary)',
+          }}
+          onMouseEnter={(e) => {
+            if (!showExportDropdown) {
+              e.currentTarget.style.color = 'var(--text-primary)'
+              e.currentTarget.style.background = 'var(--bg-panel-hover)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showExportDropdown) {
+              e.currentTarget.style.color = 'var(--text-secondary)'
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
+        >
+          <span style={{ fontSize: '15px' }}>📥</span>
+          <span>Export</span>
+          <span style={{ fontSize: '9px', opacity: 0.7 }}>▼</span>
+        </button>
+
+        {showExportDropdown && (
+          <div
+            className="absolute top-12 right-0 w-52 rounded-xl p-1.5 flex flex-col gap-0.5 glass border border-[var(--border-subtle)] shadow-xl z-50"
+            style={{ pointerEvents: 'auto' }}
+          >
+            <button
+              onClick={handleExportJson}
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs font-medium rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel-hover)] transition-colors duration-150 cursor-pointer"
+            >
+              <span>📂</span> Export Plan (JSON)
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs font-medium rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel-hover)] transition-colors duration-150 cursor-pointer"
+            >
+              <span>📤</span> Import Plan (JSON)
+            </button>
+            <button
+              onClick={handleExportGltf}
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs font-medium rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel-hover)] transition-colors duration-150 cursor-pointer"
+            >
+              <span>🧱</span> Export 3D Model (GLTF)
+            </button>
+            <button
+              onClick={handleCaptureScreenshot}
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs font-medium rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel-hover)] transition-colors duration-150 cursor-pointer"
+            >
+              <span>📸</span> Capture Image (PNG)
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Lighting Panel Toggle */}
+      <div className="glass rounded-2xl p-1 flex items-center">
+        <button
+          onClick={toggleLightingPanel}
+          title="Toggle Settings Panel (Environment & Lighting)"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 14px',
+            borderRadius: '12px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 500,
+            transition: 'all 0.2s ease',
+            background: showLightingPanel ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+            color: showLightingPanel ? '#fff' : 'var(--text-secondary)',
+            boxShadow: showLightingPanel ? '0 2px 12px rgba(99,102,241,0.4)' : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!showLightingPanel) {
+              e.currentTarget.style.color = 'var(--text-primary)'
+              e.currentTarget.style.background = 'var(--bg-panel-hover)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showLightingPanel) {
+              e.currentTarget.style.color = 'var(--text-secondary)'
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
+        >
+          <span style={{ fontSize: '15px' }}>⚙️</span>
+          <span>Settings</span>
         </button>
       </div>
 
