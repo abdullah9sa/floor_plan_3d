@@ -230,3 +230,16 @@ dist
 
 # Textures and large assets
 /textures/
+frontend/public/textures/
+
+# Model weights and checkpoints
+*.pkl
+*.pth
+*.pt
+*.bin
+*.onnx
+*.weights
+*.h5
+
+# CubiCasa5k source repository
+cubicasa5k_src/
