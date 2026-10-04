@@ -4,13 +4,11 @@
  */
 import './index.css'
 import SceneCanvas from './components/scene/SceneCanvas'
-import TopDock from './components/ui/TopDock'
 import AICommandBar from './components/ui/AICommandBar'
 import DiagnosticsOverlay from './components/ui/DiagnosticsOverlay'
-import PropertiesPanel from './components/ui/PropertiesPanel'
 import SceneInfoBar from './components/ui/SceneInfoBar'
 import FloorPlanUpload from './components/ui/FloorPlanUpload'
-import LightingPanel from './components/ui/LightingPanel'
+import InspectorToolbox from './components/ui/InspectorToolbox'
 import { useEffect } from 'react'
 import { useSceneStore } from './store/sceneStore'
 
@@ -38,18 +36,7 @@ export default function App() {
   const redo = useSceneStore(s => s.redo)
   const showUploadModal = useSceneStore(s => s.showUploadModal)
   const toggleUploadModal = useSceneStore(s => s.toggleUploadModal)
-  const darkMode = useSceneStore(s => s.darkMode)
-  const viewMode = useSceneStore(s => s.viewMode)
-  const showLightingPanel = useSceneStore(s => s.showLightingPanel)
 
-  // Toggle body light class for theme switcher
-  useEffect(() => {
-    if (darkMode) {
-      document.body.classList.remove('light')
-    } else {
-      document.body.classList.add('light')
-    }
-  }, [darkMode])
 
   // Load demo scene on mount
   useEffect(() => {
@@ -73,9 +60,7 @@ export default function App() {
       {/* Background gradient */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 0,
-        background: darkMode 
-          ? 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.05) 0%, transparent 60%)'
-          : 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.04) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.03) 0%, transparent 60%)',
+        background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.05) 0%, transparent 60%)',
         pointerEvents: 'none',
       }} />
 
@@ -89,9 +74,7 @@ export default function App() {
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           {/* All UI children must explicitly enable pointer events */}
           <div style={{ pointerEvents: 'auto' }}>
-            <TopDock />
-            <PropertiesPanel />
-            {showLightingPanel && <LightingPanel />}
+            <InspectorToolbox />
             <DiagnosticsOverlay />
             <AICommandBar />
             <SceneInfoBar />

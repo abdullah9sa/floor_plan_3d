@@ -157,22 +157,8 @@ export default function LightingPanel() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ type: 'spring', damping: 25, stiffness: 120 }}
-      style={{
-        position: 'absolute',
-        top: '80px',
-        right: '20px',
-        width: '300px',
-        pointerEvents: 'auto', // override parent pointer-events: none
-        maxHeight: 'calc(100vh - 120px)',
-        overflowY: 'auto',
-      }}
-    >
-      <div className="glass" style={{ borderRadius: '16px', padding: '18px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+    <div style={{ width: '100%', height: '100%', overflowY: 'auto' }} className="hide-scrollbar">
+      <div style={{ padding: '16px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
           <span style={{ fontSize: '16px' }}>⚙️</span>
@@ -822,6 +808,6 @@ export default function LightingPanel() {
           {saved ? '✔️ Saved Settings!' : '💾 Save as Default'}
         </button>
       </div>
-    </motion.div>
+    </div>
   )
 }

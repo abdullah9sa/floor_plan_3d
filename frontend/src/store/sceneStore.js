@@ -48,6 +48,8 @@ export const useSceneStore = create(
     selectedId: null,
     hoveredId: null,
     aiLoading: false,
+    selectedModel: 'gemini-1.5-pro-latest',
+    aiChatHistory: [],
     diagnostics: [],
     sceneCenter: [7, 0, 5],   // auto-computed camera target [x, y, z]
     sceneRadius: 10,          // approximate scene radius for camera zoom
@@ -189,6 +191,9 @@ export const useSceneStore = create(
     setSelected: (id) => set({ selectedId: id }),
     setHovered: (id) => set({ hoveredId: id }),
     setAiLoading: (v) => set({ aiLoading: v }),
+    setSelectedModel: (model) => set({ selectedModel: model }),
+    addAiChatMessage: (msg) => set(s => ({ aiChatHistory: [msg, ...s.aiChatHistory] })),
+    clearAiChatHistory: () => set({ aiChatHistory: [] }),
     addDiagnostic: (d) => set(s => ({ diagnostics: [...s.diagnostics, d] })),
     clearDiagnostics: () => set({ diagnostics: [] }),
 
@@ -348,7 +353,6 @@ function applyMutationToScene(scene, type, payload) {
       const room = s.rooms[roomIndex]
       const sf = payload.scale_factor || 1.0
       
-      // Calculate centroid
       let cx = 0, cz = 0
       for (const [x, z] of room.polygon) {
         cx += x; cz += z
@@ -356,36 +360,45 @@ function applyMutationToScene(scene, type, payload) {
       cx /= room.polygon.length
       cz /= room.polygon.length
       
-      const newPolygon = room.polygon.map(([x, z]) => [
-        cx + (x - cx) * sf,
-        cz + (z - cz) * sf
-      ])
+      const pointDeltas = []
+      const oldPolygon = room.polygon.map(p => [...p])
+      const newPolygon = room.polygon.map(([x, z]) => {
+        const nx = cx + (x - cx) * sf
+        const nz = cz + (z - cz) * sf
+        pointDeltas.push({
+          oldX: x, oldZ: z,
+          newX: nx, newZ: nz
+        })
+        return [nx, nz]
+      })
       
-      // Update walls
-      for (let i = 0; i < room.polygon.length; i++) {
-        const p1 = room.polygon[i]
-        const p2 = room.polygon[(i + 1) % room.polygon.length]
-        const np1 = newPolygon[i]
-        const np2 = newPolygon[(i + 1) % newPolygon.length]
-        
-        for (const w of s.walls) {
-          const startMatches = (Math.abs(w.start[0] - p1[0]) < 0.1 && Math.abs(w.start[1] - p1[1]) < 0.1)
-          const endMatches = (Math.abs(w.end[0] - p2[0]) < 0.1 && Math.abs(w.end[1] - p2[1]) < 0.1)
-          
-          const startMatchesRev = (Math.abs(w.start[0] - p2[0]) < 0.1 && Math.abs(w.start[1] - p2[1]) < 0.1)
-          const endMatchesRev = (Math.abs(w.end[0] - p1[0]) < 0.1 && Math.abs(w.end[1] - p1[1]) < 0.1)
-          
-          if (startMatches && endMatches) {
-            w.start = [...np1]
-            w.end = [...np2]
-          } else if (startMatchesRev && endMatchesRev) {
-            w.start = [...np2]
-            w.end = [...np1]
+      const EPSILON = 0.05
+      const applyDelta = (pt) => {
+        for (const d of pointDeltas) {
+          if (Math.abs(pt[0] - d.oldX) < EPSILON && Math.abs(pt[1] - d.oldZ) < EPSILON) {
+            pt[0] = d.newX
+            pt[1] = d.newZ
+            return true
+          }
+        }
+        return false
+      }
+      
+      for (const r of s.rooms) {
+        if (r.id === room.id) {
+          r.polygon = newPolygon
+        } else {
+          for (let i = 0; i < r.polygon.length; i++) {
+            applyDelta(r.polygon[i])
           }
         }
       }
       
-      // Point in polygon helper
+      for (const w of s.walls) {
+        applyDelta(w.start)
+        applyDelta(w.end)
+      }
+      
       const pointInPoly = (x, y, poly) => {
         let inside = false
         for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -396,15 +409,53 @@ function applyMutationToScene(scene, type, payload) {
         return inside
       }
       
-      // Move furniture
       for (const f of s.furniture) {
-        if (pointInPoly(f.position[0], f.position[2], room.polygon)) {
+        if (pointInPoly(f.position[0], f.position[2], oldPolygon)) {
           f.position[0] = cx + (f.position[0] - cx) * sf
           f.position[2] = cz + (f.position[2] - cz) * sf
         }
       }
       
-      room.polygon = newPolygon
+      break
+    }
+    
+    case 'SCALE_SCENE': {
+      const sf = payload.scale_factor || 1.0
+      let cx = 0, cz = 0
+      
+      if (payload.origin) {
+        cx = payload.origin[0]
+        cz = payload.origin[1]
+      } else {
+        let count = 0
+        for (const w of s.walls) {
+          cx += w.start[0] + w.end[0]
+          cz += w.start[1] + w.end[1]
+          count += 2
+        }
+        if (count > 0) { cx /= count; cz /= count }
+      }
+
+      for (const r of s.rooms) {
+        r.polygon = r.polygon.map(([x, z]) => [
+          cx + (x - cx) * sf,
+          cz + (z - cz) * sf
+        ])
+      }
+      
+      for (const w of s.walls) {
+        w.start = [cx + (w.start[0] - cx) * sf, cz + (w.start[1] - cz) * sf]
+        w.end = [cx + (w.end[0] - cx) * sf, cz + (w.end[1] - cz) * sf]
+      }
+      
+      for (const f of s.furniture) {
+        f.position[0] = cx + (f.position[0] - cx) * sf
+        f.position[2] = cz + (f.position[2] - cz) * sf
+      }
+      
+      for (const o of s.openings) {
+        if (o.width) o.width *= sf
+      }
       break
     }
 

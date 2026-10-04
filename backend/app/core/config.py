@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
 
+    # AI Cache Settings
+    AI_CACHE_MAX_SIZE: int = 100
+    AI_CACHE_TTL_SECONDS: int = 300
+
     class Config:
         env_file = ".env"
         extra = "ignore"

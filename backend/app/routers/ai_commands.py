@@ -1,15 +1,12 @@
 """
 AI Commands router
 Handles natural language → scene mutation translation.
-Phase 1: Rule-based parser. Phase 4: Groq/Gemini integration.
 """
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any
-import re
 
 from app.services.ai_agent import AIAgent
-from app.routers.scene import _scenes
 
 router = APIRouter()
 agent = AIAgent()
@@ -17,7 +14,10 @@ agent = AIAgent()
 
 class AICommandRequest(BaseModel):
     prompt: str
+    model: str = "gemini-1.5-pro-latest"
     scene_id: str | None = None
+    scene_snapshot: Dict[str, Any] | None = None
+    selected_object_id: str | None = None
 
 
 class MutationResult(BaseModel):
@@ -29,17 +29,28 @@ class AICommandResponse(BaseModel):
     response: str
     mutations: List[MutationResult]
     confidence: float
+    cached: bool = False
+    model_used: str = ""
 
 
 @router.post("/command", response_model=AICommandResponse)
 async def ai_command(req: AICommandRequest):
     """
     Receive a natural language command and return scene mutations.
-    Mutation Pipeline: User Prompt → AI Proposal → (Phase 3) Constraint Validation → Commit
+    Mutation Pipeline: User Prompt → AI Proposal → Constraint Validation → Commit
     """
-    scene = None
-    if req.scene_id and req.scene_id in _scenes:
-        scene = _scenes[req.scene_id]
-
-    res = agent.process_command(req.prompt, scene)
+    res = agent.process_command(
+        prompt=req.prompt,
+        model=req.model,
+        scene_snapshot=req.scene_snapshot,
+        selected_object_id=req.selected_object_id
+    )
     return AICommandResponse(**res)
+
+@router.get("/models")
+async def get_models():
+    """Returns available models and their configuration status."""
+    return {
+        "gemini_configured": bool(agent.gemini_key),
+        "groq_configured": bool(agent.groq_key)
+    }

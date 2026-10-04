@@ -161,22 +161,8 @@ export default function PropertiesPanel() {
   const textureLabel = isRoom ? "Floor Texture" : isWall ? "Wall Texture" : "Door Texture"
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
-        transition={{ duration: 0.25 }}
-        style={{
-          position: 'absolute',
-          left: '16px',
-          top: '80px',
-          zIndex: 40,
-          width: '260px',
-          pointerEvents: 'auto'
-        }}
-      >
-        <div className="glass" style={{ borderRadius: '16px', padding: '16px' }}>
+    <div style={{ width: '100%' }}>
+      <div style={{ padding: '16px' }}>
           {selectedObj ? (
             <>
               {/* Header for Selected Object */}
@@ -334,8 +320,7 @@ export default function PropertiesPanel() {
               />
             </>
           )}
-        </div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </div>
   )
 }
